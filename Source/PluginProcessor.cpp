@@ -19,7 +19,11 @@ CircularBufferAudioProcessor::CircularBufferAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+treeState(*this, nullptr, "PARAMETER", {
+    std::make_unique<juce::AudioParameterInt>(DELAY_ID, DELAY_NAME, 1, 5000, 50),
+    std::make_unique<juce::AudioParameterFloat>(FEEDBACK_ID, FEEDBACK_NAME, 0, 0.99, 0.3)
+})
 #endif
 {
 }
@@ -138,8 +142,10 @@ bool CircularBufferAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 
 void CircularBufferAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    mStartGain  = JUCE_LIVE_CONSTANT(0.8);
-    mEndGain = JUCE_LIVE_CONSTANT(0.8);
+    // gain input
+    mStartGain = treeState.getRawParameterValue(FEEDBACK_ID)->load();
+    mEndGain = mStartGain;
+    
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -190,7 +196,7 @@ void CircularBufferAudioProcessor::fillDelayBuffer(int channel, const int buffer
 
 void CircularBufferAudioProcessor::getFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData)
 {
-    int delayTime = JUCE_LIVE_CONSTANT(100); // ms (delay time, this should be a variable at some point)
+    int delayTime = treeState.getRawParameterValue(DELAY_ID)->load(); // ms (delay time, this should be a variable at some point)
     int n_ms_in_s = 1000; //
     const int readPosition = static_cast<int>(delayBufferLength + mWritePosition - (mSampleRate*delayTime/n_ms_in_s)) % delayBufferLength; // it is important that everything within this statis cast remains an int
     
